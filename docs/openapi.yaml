@@ -1,0 +1,2303 @@
+openapi: 3.0.3
+info:
+  title: E-commerce Backend API
+  version: 1.0.0
+  description: |
+    OpenAPI specification generated from the source code in this repository.
+
+    Notes:
+    - Base path has no `/api` prefix.
+    - This spec reflects the current code, including route naming inconsistencies.
+    - Many admin-style routes are not protected in the backend.
+    - `GET /getsinglesubcat` is documented as implemented, even though the route is misconfigured.
+servers:
+  - url: http://localhost:5001
+    description: Local development server
+tags:
+  - name: Auth & Users
+  - name: Staff
+  - name: Categories
+  - name: Subcategories
+  - name: Products
+  - name: Orders & Payments
+  - name: FAQ
+  - name: Contact
+paths:
+  /signup:
+    post:
+      tags: [Auth & Users]
+      summary: Create a new user account
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+            examples:
+              default:
+                value:
+                  data:
+                    name: Anand
+                    email: anand@example.com
+                    phone: '9999999999'
+                    password: secret123
+                    loginVia: false
+      responses:
+        '200':
+          description: User created or duplicate user reported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMessageResponse'
+              examples:
+                created:
+                  value:
+                    message: user created successfully
+                    status: 1
+                duplicate:
+                  value:
+                    message: user already exist
+                    status: 0
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMessageResponse'
+              example:
+                message: Error in sign up
+                status: 1
+
+  /login:
+    post:
+      tags: [Auth & Users]
+      summary: Log in a user and receive a JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LoginRequest'
+                - $ref: '#/components/schemas/LoginViaRequest'
+            examples:
+              passwordLogin:
+                value:
+                  data:
+                    email: anand@example.com
+                    password: secret123
+              loginVia:
+                value:
+                  data:
+                    name: Anand
+                    email: anand@example.com
+                    loginVia: true
+      responses:
+        '200':
+          description: Login success or logical auth failure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LoginResponse'
+                  - $ref: '#/components/schemas/AuthFailureResponse'
+              examples:
+                success:
+                  value:
+                    message: Authenticated!,User Login Successfuly
+                    token: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    status: true
+                    role: customer
+                wrongPassword:
+                  value:
+                    message: Password Incorrect
+                    status: false
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthFailureResponse'
+              example:
+                message: Internal server error
+                status: false
+
+  /updateuser/{id}:
+    patch:
+      tags: [Auth & Users]
+      summary: Update a user by id
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithUpdateCount'
+              example:
+                message: User Details Updated Successfully
+                data: [1]
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deleteUser/{id}:
+    delete:
+      tags: [Auth & Users]
+      summary: Delete a user by id
+      operationId: deleteUser
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteUserResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessFlagMessage'
+              example:
+                message: Error in deleting user
+                success: false
+
+  /getalluser:
+    get:
+      tags: [Auth & Users]
+      summary: List all users
+      operationId: getAllUsers
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getuserbyid/{email}:
+    get:
+      tags: [Auth & Users]
+      summary: Get one user by email
+      operationId: getUserByEmail
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: User row or null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /roleupdate/{id}:
+    patch:
+      tags: [Auth & Users]
+      summary: Update user role and access flags
+      operationId: roleUpdate
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      responses:
+        '200':
+          description: Role updated or logical failure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RoleUpdateResponse'
+                  - $ref: '#/components/schemas/RoleUpdateFailureResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessFlagMessage'
+              example:
+                message: Internal Server erroror editUser
+                success: 0
+
+  /addstaff:
+    post:
+      tags: [Staff]
+      summary: Create a staff member
+      operationId: addStaff
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffCreateRequest'
+      responses:
+        '200':
+          description: Staff created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffCreateResponse'
+        '500':
+          description: Duplicate staff or server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              examples:
+                duplicate:
+                  value:
+                    message: Staff Member already exists
+
+  /getstaffs:
+    get:
+      tags: [Staff]
+      summary: List all staff members
+      operationId: getStaffs
+      responses:
+        '200':
+          description: Staff list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffMember'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getsinglestaff/{id}:
+    get:
+      tags: [Staff]
+      summary: Get one staff member by id
+      operationId: getSingleStaff
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Staff row or null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMember'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updatestaff/{id}:
+    patch:
+      tags: [Staff]
+      summary: Update a staff member
+      operationId: updateStaff
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffCreateRequest'
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessFlagMessage'
+              example:
+                success: 1
+                message: Data updated Successfully
+        '500':
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessFlagMessage'
+              example:
+                success: 0
+                message: Data does not updated
+
+  /deletestaff/{id}:
+    delete:
+      tags: [Staff]
+      summary: Delete a staff member
+      operationId: deleteStaff
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Staff deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Deleted the user
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addcategory:
+    post:
+      tags: [Categories]
+      summary: Create a category
+      operationId: addCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreateRequest'
+      responses:
+        '200':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryCreateResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getallcategory:
+    get:
+      tags: [Categories]
+      summary: List all categories
+      operationId: getAllCategories
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '404':
+          description: No category found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: No Category Found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getsignlecategory/{id}:
+    get:
+      tags: [Categories]
+      summary: Get a category by id
+      operationId: getSingleCategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Category result array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updatecategory/{id}:
+    patch:
+      tags: [Categories]
+      summary: Update a category name
+      operationId: updateCategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category_name]
+              properties:
+                category_name:
+                  type: string
+              example:
+                category_name: Consumer Electronics
+      responses:
+        '200':
+          description: Update count array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCountArray'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deletecategory/{id}:
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      operationId: deleteCategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Category deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Category Deleted Succesfully
+        '400':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: No such Category found.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addsubcategory:
+    post:
+      tags: [Subcategories]
+      summary: Create a subcategory
+      operationId: addSubcategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubcategoryCreateRequest'
+      responses:
+        '200':
+          description: Subcategory created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subcategory'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getallsubcategory:
+    get:
+      tags: [Subcategories]
+      summary: List all subcategories with parent category
+      operationId: getAllSubcategories
+      responses:
+        '200':
+          description: Subcategory list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubcategoryWithCategory'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getsinglesubcat:
+    get:
+      tags: [Subcategories]
+      summary: Misconfigured single-subcategory endpoint
+      description: The route has no `{id}` segment, but the controller expects `req.params.id`.
+      operationId: getSingleSubcategoryBroken
+      responses:
+        '200':
+          description: Undefined or null-like result depending on runtime behavior
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subcategory'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updatesubcat/{id}:
+    patch:
+      tags: [Subcategories]
+      summary: Update a subcategory
+      operationId: updateSubcategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubcategoryCreateRequest'
+      responses:
+        '200':
+          description: Subcategory updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusAndDataResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /removesubcate/{id}:
+    delete:
+      tags: [Subcategories]
+      summary: Delete a subcategory
+      operationId: deleteSubcategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Destroy count
+          content:
+            application/json:
+              schema:
+                type: integer
+                example: 1
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addProduct:
+    post:
+      tags: [Products]
+      summary: Create a product with images
+      operationId: addProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductCreateForm'
+      responses:
+        '200':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '500':
+          description: Product creation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in add Product ctrl
+
+  /getSingleProduct/{id}:
+    get:
+      tags: [Products]
+      summary: Get one product by id
+      operationId: getSingleProduct
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Product row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '500':
+          description: Product fetch error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in get Product by id ctrl
+
+  /getAllProduct:
+    get:
+      tags: [Products]
+      summary: List all products
+      operationId: getAllProducts
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getProductByCate/{id}:
+    get:
+      tags: [Products]
+      summary: List products by category id
+      operationId: getProductsByCategory
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Filtered product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '500':
+          description: Product fetch error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in get Product by category ctrl
+
+  /getProductByCategAndSubCate/{subcate}/{categ}:
+    get:
+      tags: [Products]
+      summary: List products by subcategory and category
+      operationId: getProductsByCategoryAndSubcategory
+      parameters:
+        - name: subcate
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categ
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Filtered product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updateProductImg/{id}:
+    post:
+      tags: [Products]
+      summary: Append images to a product
+      operationId: updateProductImages
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductImageUploadForm'
+      responses:
+        '200':
+          description: Images updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Updated  Successfully
+        '500':
+          description: Product image update error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in update Product by id ctrl
+
+  /specificImgDelete/{id}/{index}:
+    post:
+      tags: [Products]
+      summary: Delete a single image from a product by array index
+      operationId: deleteSpecificProductImage
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: index
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Sequelize update count array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCountArray'
+        '500':
+          description: Image delete error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in specific img ctrl
+
+  /updateProductDetail/{id}:
+    patch:
+      tags: [Products]
+      summary: Update product fields and optional replacement images
+      operationId: updateProductDetail
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductUpdateForm'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusAndDataResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deleteProduct/{id}:
+    delete:
+      tags: [Products]
+      summary: Delete a product
+      operationId: deleteProduct
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Product deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Item Deleted Succesfully
+        '500':
+          description: Product delete error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in delete Product by id ctrl
+
+  /getproductbyvandor:
+    get:
+      tags: [Products]
+      summary: Paginated product list filtered by vendor
+      operationId: getProductsByVendor
+      parameters:
+        - name: vendor
+          in: query
+          required: true
+          schema:
+            type: string
+            example: vendor@example.com
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PageSizeQuery'
+      responses:
+        '200':
+          description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductsResponse'
+        '500':
+          description: Product fetch error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Something went wrong in get Product by id ctrl
+
+  /getproManageByCate:
+    get:
+      tags: [Products]
+      summary: Paginated vendor products filtered by category
+      operationId: getProductsByVendorAndCategory
+      parameters:
+        - name: vandor
+          in: query
+          required: true
+          schema:
+            type: string
+            example: vendor@example.com
+        - name: category
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PageSizeQuery'
+      responses:
+        '200':
+          description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getProManageBySub:
+    get:
+      tags: [Products]
+      summary: Paginated vendor products filtered by category and subcategory
+      operationId: getProductsByVendorCategorySubcategory
+      parameters:
+        - name: vandor
+          in: query
+          required: true
+          schema:
+            type: string
+            example: vendor@example.com
+        - name: category
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: subcate
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 2
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PageSizeQuery'
+      responses:
+        '200':
+          description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getProOnNext:
+    get:
+      tags: [Products]
+      summary: Alternate paginated vendor/product endpoint
+      operationId: getProductsOnNext
+      parameters:
+        - name: vendor
+          in: query
+          required: true
+          schema:
+            type: string
+            example: all
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            example: '1'
+        - name: subcate
+          in: query
+          required: false
+          schema:
+            type: string
+            example: '2'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PageSizeQuery'
+      responses:
+        '200':
+          description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getallorder:
+    get:
+      tags: [Orders & Payments]
+      summary: List all customer orders
+      operationId: getAllOrders
+      responses:
+        '200':
+          description: Order list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerOrder'
+        '500':
+          description: Order fetch error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: string
+                    example: Customer order not Found
+                  - $ref: '#/components/schemas/GenericMessage'
+
+  /getsingleorder/{id}:
+    get:
+      tags: [Orders & Payments]
+      summary: Get one order by id
+      operationId: getSingleOrder
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Array with matching order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerOrder'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                type: string
+                example: The Customer Order you are looking for is not available!
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addorder:
+    post:
+      tags: [Orders & Payments]
+      summary: Create a Razorpay order
+      operationId: createRazorpayOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRazorpayOrderRequest'
+      responses:
+        '200':
+          description: Razorpay order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RazorpayOrder'
+        '500':
+          description: Razorpay or server error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: string
+                    example: Some error occured
+                  - type: object
+
+  /success:
+    post:
+      tags: [Orders & Payments]
+      summary: Verify payment signature and persist the order
+      operationId: verifyPaymentAndSaveOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentSuccessRequest'
+      responses:
+        '200':
+          description: Payment verified and order stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSuccessResponse'
+        '400':
+          description: Signature verification failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                example:
+                  msg: Transaction not legit!
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updateorder/{id}:
+    patch:
+      tags: [Orders & Payments]
+      summary: Update an order by id
+      operationId: updateOrder
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUpdateRequest'
+      responses:
+        '200':
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusAndDataResponse'
+              example:
+                status: [1]
+                data:
+                  status: processing
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deleteorder/{id}:
+    delete:
+      tags: [Orders & Payments]
+      summary: Delete an order by id
+      operationId: deleteOrder
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Order deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteByCountResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getFaq/{id}:
+    get:
+      tags: [FAQ]
+      summary: Get one FAQ by id
+      operationId: getFaq
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: FAQ result array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Faq'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getAllFaq:
+    get:
+      tags: [FAQ]
+      summary: List all FAQs
+      operationId: getAllFaq
+      responses:
+        '200':
+          description: FAQ list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Faq'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addFaq:
+    post:
+      tags: [FAQ]
+      summary: Create an FAQ entry
+      operationId: addFaq
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaqInput'
+      responses:
+        '200':
+          description: FAQ created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Faq'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updateFaq/{id}:
+    patch:
+      tags: [FAQ]
+      summary: Update an FAQ entry
+      operationId: updateFaq
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaqInput'
+      responses:
+        '200':
+          description: FAQ updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Faq Updated Successfully
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deleteFaq/{id}:
+    delete:
+      tags: [FAQ]
+      summary: Delete an FAQ entry
+      operationId: deleteFaq
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: FAQ deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+              example:
+                message: Deleted succesfully
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getAllcontact:
+    get:
+      tags: [Contact]
+      summary: List all contact messages
+      operationId: getAllContact
+      responses:
+        '201':
+          description: Contact list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContactMessage'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /getcontact/{id}:
+    get:
+      tags: [Contact]
+      summary: Get one contact message by id
+      operationId: getContact
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '201':
+          description: Contact row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactMessage'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /addcontact:
+    post:
+      tags: [Contact]
+      summary: Create a contact message
+      operationId: addContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactInput'
+      responses:
+        '201':
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactCreateResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deletecontact/{id}:
+    delete:
+      tags: [Contact]
+      summary: Delete a contact message
+      operationId: deleteContact
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '201':
+          description: Contact deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteMessageWithCount'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /updatecontact/{id}:
+    patch:
+      tags: [Contact]
+      summary: Update a contact message
+      operationId: updateContact
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactUpdateRequest'
+      responses:
+        '201':
+          description: Contact updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateContactResponse'
+        '401':
+          description: Contact row not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                example:
+                  Message: User not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    PageQuery:
+      name: page
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    PageSizeQuery:
+      name: pageSize
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 10
+
+  responses:
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericMessage'
+          example:
+            message: Internal server error
+
+  schemas:
+    PermissionFlags:
+      type: object
+      properties:
+        canManageProducts:
+          type: boolean
+        canManageCategory:
+          type: boolean
+        canManageSubCategory:
+          type: boolean
+        canManageUsers:
+          type: boolean
+        canManageOrders:
+          type: boolean
+      example:
+        canManageProducts: false
+        canManageCategory: false
+        canManageSubCategory: false
+        canManageUsers: false
+        canManageOrders: false
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+        loginVia:
+          type: boolean
+        role:
+          type: string
+          enum: [admin, vandor, customer]
+        canAccess:
+          $ref: '#/components/schemas/PermissionFlags'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Anand
+        email: anand@example.com
+        phone: '9999999999'
+        password: '$2b$10$...'
+        loginVia: false
+        role: customer
+        canAccess:
+          canManageProducts: false
+          canManageCategory: false
+          canManageSubCategory: false
+          canManageUsers: false
+          canManageOrders: false
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    SignupPayload:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+        loginVia:
+          type: boolean
+        role:
+          type: string
+          enum: [admin, vandor, customer]
+      example:
+        name: Anand
+        email: anand@example.com
+        phone: '9999999999'
+        password: secret123
+        loginVia: false
+
+    SignupRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/SignupPayload'
+
+    LoginPayload:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      example:
+        email: anand@example.com
+        password: secret123
+
+    LoginRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/LoginPayload'
+
+    LoginViaPayload:
+      type: object
+      required: [name, email, loginVia]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        loginVia:
+          type: boolean
+      example:
+        name: Anand
+        email: anand@example.com
+        loginVia: true
+
+    LoginViaRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/LoginViaPayload'
+
+    StatusMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        status:
+          oneOf:
+            - type: integer
+            - type: boolean
+      example:
+        message: user created successfully
+        status: 1
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        token:
+          type: string
+        status:
+          type: boolean
+        role:
+          type: string
+          enum: [admin, vandor, customer]
+      example:
+        message: Authenticated!,User Login Successfuly
+        token: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        status: true
+        role: customer
+
+    AuthFailureResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        status:
+          type: boolean
+      example:
+        message: Password Incorrect
+        status: false
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+      example:
+        name: Anand Patel
+        phone: '8888888888'
+        password: newSecret123
+
+    RoleUpdateRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, vandor, customer]
+        canManageProducts:
+          type: boolean
+        canManageCategory:
+          type: boolean
+        canManageSubCategory:
+          type: boolean
+        canManageUsers:
+          type: boolean
+        canManageOrders:
+          type: boolean
+      example:
+        role: admin
+        canManageProducts: true
+        canManageCategory: true
+        canManageSubCategory: true
+        canManageUsers: true
+        canManageOrders: true
+
+    RoleUpdateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/RoleUpdateRequest'
+        success:
+          type: integer
+      example:
+        message: Role updated successfully.
+        data:
+          role: admin
+          canManageProducts: true
+          canManageCategory: true
+          canManageSubCategory: true
+          canManageUsers: true
+          canManageOrders: true
+        success: 1
+
+    RoleUpdateFailureResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        success:
+          type: integer
+      example:
+        message: Error in update role
+        success: 0
+
+    SuccessFlagMessage:
+      type: object
+      properties:
+        success:
+          oneOf:
+            - type: boolean
+            - type: integer
+        message:
+          type: string
+      example:
+        success: 1
+        message: Data updated Successfully
+
+    DeleteUserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        success:
+          type: boolean
+      example:
+        id: '5'
+        message: User deleted successfully
+        success: true
+
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Staff One
+        email: staff@example.com
+        phone: '7777777777'
+        password: '$2b$10$...'
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    StaffCreateRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+      example:
+        name: Staff One
+        email: staff@example.com
+        phone: '7777777777'
+        password: staffSecret
+
+    StaffCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        newMember:
+          $ref: '#/components/schemas/StaffMember'
+      example:
+        message: Staff Member Created Successfully
+        newMember:
+          id: 1
+          name: Staff One
+          email: staff@example.com
+          phone: '7777777777'
+          password: '$2b$10$...'
+          createdAt: '2024-01-01T00:00:00.000Z'
+          updatedAt: '2024-01-01T00:00:00.000Z'
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        category_name:
+          type: string
+        uploadby:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        category_name: Electronics
+        uploadby: admin@example.com
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    CategoryCreateRequest:
+      type: object
+      required: [category_name]
+      properties:
+        category_name:
+          type: string
+        uploadby:
+          type: string
+      example:
+        category_name: Electronics
+        uploadby: admin@example.com
+
+    CategoryCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Category'
+      example:
+        message: Category has been created successfully
+        data:
+          id: 1
+          category_name: Electronics
+          uploadby: admin@example.com
+          createdAt: '2024-01-01T00:00:00.000Z'
+          updatedAt: '2024-01-01T00:00:00.000Z'
+
+    Subcategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        category_id:
+          type: integer
+        subcategory_name:
+          type: string
+        uploadby:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        category_id: 1
+        subcategory_name: Mobiles
+        uploadby: admin@example.com
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    SubcategoryCreateRequest:
+      type: object
+      required: [category_id, subcategory_name]
+      properties:
+        category_id:
+          type: integer
+        subcategory_name:
+          type: string
+        uploadby:
+          type: string
+      example:
+        category_id: 1
+        subcategory_name: Mobiles
+        uploadby: admin@example.com
+
+    SubcategoryWithCategory:
+      allOf:
+        - $ref: '#/components/schemas/Subcategory'
+        - type: object
+          properties:
+            category:
+              $ref: '#/components/schemas/Category'
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        subcateId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+        description:
+          type: string
+        categ:
+          type: integer
+        image:
+          type: array
+          items:
+            type: string
+        place:
+          type: string
+          enum: [Regular, Hot deal, Main carousel, Week deal]
+        uploadby:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        subcateId: 1
+        name: iPhone 15
+        price: 79999
+        description: Latest model
+        categ: 1
+        image:
+          - image_1710000000000.jpg
+          - image_1710000001000.jpg
+        place: Main carousel
+        uploadby: vendor@example.com
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    ProductCreateForm:
+      type: object
+      required: [subcateId, name, price, description, categ, image]
+      properties:
+        subcateId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        description:
+          type: string
+        categ:
+          type: integer
+        place:
+          type: string
+          enum: [Regular, Hot deal, Main carousel, Week deal]
+        uploadby:
+          type: string
+        image:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    ProductImageUploadForm:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    ProductUpdateForm:
+      type: object
+      properties:
+        id:
+          type: integer
+        subcateId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        description:
+          type: string
+        categ:
+          type: integer
+        place:
+          type: string
+          enum: [Regular, Hot deal, Main carousel, Week deal]
+        uploadby:
+          type: string
+        image:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    PaginatedProductsResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+          description: Total number of pages, not total number of records
+        currentpage:
+          type: integer
+      example:
+        products:
+          - id: 1
+            subcateId: 1
+            name: iPhone 15
+            price: 79999
+            description: Latest model
+            categ: 1
+            image: [image_1710000000000.jpg]
+            place: Main carousel
+            uploadby: vendor@example.com
+            createdAt: '2024-01-01T00:00:00.000Z'
+            updatedAt: '2024-01-01T00:00:00.000Z'
+        total: 3
+        currentpage: 1
+
+    OrderItem:
+      type: object
+      additionalProperties: true
+      example:
+        id: 1
+        name: iPhone 15
+        price: 79999
+
+    CustomerOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: string
+        city:
+          type: string
+        pincode:
+          type: integer
+        phone:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, delivered]
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        quantity:
+          type: integer
+        total:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Anand
+        email: anand@example.com
+        address: 123 Main St
+        city: Ahmedabad
+        pincode: 380001
+        phone: 9999999999
+        status: pending
+        products:
+          - id: 1
+            name: iPhone 15
+            price: 79999
+        quantity: 1
+        total: 79999
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    CreateRazorpayOrderRequest:
+      type: object
+      required: [total]
+      properties:
+        total:
+          type: number
+      example:
+        total: 79999
+
+    RazorpayOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        entity:
+          type: string
+        amount:
+          type: integer
+        amount_paid:
+          type: integer
+        amount_due:
+          type: integer
+        currency:
+          type: string
+        receipt:
+          type: string
+        status:
+          type: string
+      example:
+        id: order_Q123456789
+        entity: order
+        amount: 7999900
+        amount_paid: 0
+        amount_due: 7999900
+        currency: INR
+        receipt: receipt_order_74394
+        status: created
+
+    PaymentSuccessRequest:
+      type: object
+      required: [orderCreationId, razorpayPaymentId, razorpayOrderId, razorpaySignature, data]
+      properties:
+        orderCreationId:
+          type: string
+        razorpayPaymentId:
+          type: string
+        razorpayOrderId:
+          type: string
+        razorpaySignature:
+          type: string
+        data:
+          $ref: '#/components/schemas/CustomerOrderCreatePayload'
+
+    CustomerOrderCreatePayload:
+      type: object
+      required: [name, email, address, city, pincode, phone, quantity, total]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: string
+        city:
+          type: string
+        pincode:
+          type: integer
+        phone:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, delivered]
+          default: pending
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        quantity:
+          type: integer
+        total:
+          type: integer
+      example:
+        name: Anand
+        email: anand@example.com
+        address: 123 Main St
+        city: Ahmedabad
+        pincode: 380001
+        phone: 9999999999
+        status: pending
+        products:
+          - id: 1
+            name: iPhone 15
+            price: 79999
+        quantity: 1
+        total: 79999
+
+    PaymentSuccessResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        orderId:
+          type: string
+        paymentId:
+          type: string
+      example:
+        msg: success
+        orderId: order_Q123456789
+        paymentId: pay_Q123456789
+
+    OrderUpdateRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            status: processing
+
+    Faq:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        ques:
+          type: string
+        ans:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        title: Shipping
+        ques: How long does shipping take?
+        ans: 3 to 5 business days
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    FaqInput:
+      type: object
+      required: [title, ques]
+      properties:
+        title:
+          type: string
+        ques:
+          type: string
+        ans:
+          type: string
+      example:
+        title: Shipping
+        ques: How long does shipping take?
+        ans: 3 to 5 business days
+
+    ContactMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        subject:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Anand
+        email: anand@example.com
+        subject: Need help
+        message: Please contact me about my order.
+        createdAt: '2024-01-01T00:00:00.000Z'
+        updatedAt: '2024-01-01T00:00:00.000Z'
+
+    ContactInput:
+      type: object
+      required: [name, email, subject, message]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        subject:
+          type: string
+        message:
+          type: string
+      example:
+        name: Anand
+        email: anand@example.com
+        subject: Need help
+        message: Please contact me about my order.
+
+    ContactUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        subject:
+          type: string
+        message:
+          type: string
+      example:
+        subject: Updated subject
+        message: Updated message
+
+    ContactCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ContactMessage'
+      example:
+        message: Message has been sended succesfully
+        data:
+          id: 1
+          name: Anand
+          email: anand@example.com
+          subject: Need help
+          message: Please contact me about my order.
+          createdAt: '2024-01-01T00:00:00.000Z'
+          updatedAt: '2024-01-01T00:00:00.000Z'
+
+    UpdateContactResponse:
+      type: object
+      properties:
+        Message:
+          type: string
+        updatedData:
+          $ref: '#/components/schemas/UpdateCountArray'
+      example:
+        Message: Data Updated Successfully
+        updatedData: [1]
+
+    GenericMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      example:
+        message: Operation completed
+
+    DeleteMessageWithCount:
+      type: object
+      properties:
+        Message:
+          type: string
+        data:
+          type: integer
+      example:
+        Message: data deleted succesfully
+        data: 1
+
+    DeleteByCountResponse:
+      type: object
+      properties:
+        data:
+          type: integer
+        id:
+          type: string
+      example:
+        data: 1
+        id: '1'
+
+    MessageWithUpdateCount:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UpdateCountArray'
+      example:
+        message: User Details Updated Successfully
+        data: [1]
+
+    UpdateCountArray:
+      type: array
+      items:
+        type: integer
+      example: [1]
+
+    StatusAndDataResponse:
+      type: object
+      properties:
+        status:
+          oneOf:
+            - type: integer
+            - $ref: '#/components/schemas/UpdateCountArray'
+        data:
+          type: object
+          additionalProperties: true
+      example:
+        status: 1
+        data:
+          category_id: 1
+          subcategory_name: Smartphones
+          uploadby: admin@example.com
